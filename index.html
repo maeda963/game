@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Fish Catcher</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a1a;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #0ea5e9, #1e3a8a);
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        #score-board {
+            position: absolute;
+            top: 20px;
+            left: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .touch-btn {
+            position: absolute;
+            bottom: 0;
+            width: 50%;
+            height: 100%;
+            z-index: 5;
+            background: transparent;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        #btn-left { left: 0; }
+        #btn-right { right: 0; }
+
+        /* オーバーレイ共通 */
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20;
+            color: #fff;
+            padding: 20px;
+            text-align: center;
+        }
+
+        /* スタート画面用の美少女イラスト (SVGインライン埋め込み) */
+        .character-img {
+            width: 180px;
+            height: 180px;
+            margin-bottom: 15px;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='52' r='38' fill='%2338bdf8' opacity='0.3'/><path d='M35,65 Q50,55 65,65 L60,85 L40,85 Z' fill='%23f43f5e'/><path d='M38,80 L42,95 L58,95 L62,80 Z' fill='%23ffffff'/><path d='M35,40 Q50,25 65,40 Q75,65 65,75 Q50,75 35,75 Q25,65 35,40 Z' fill='%23fed7aa'/><circle cx='42' cy='52' r='5' fill='%231e293b'/><circle cx='58' cy='52' r='5' fill='%231e293b'/><circle cx='43' cy='50' r='1.5' fill='%23ffffff'/><circle cx='59' cy='50' r='1.5' fill='%23ffffff'/><path d='M46,62 Q50,66 54,62' fill='none' stroke='%23e11d48' stroke-width='3' stroke-linecap='round'/><path d='M25,25 Q15,45 28,50 Q30,25 50,25 Q70,25 72,50 Q85,45 75,25 Q50,10 25,25 Z' fill='%23475569'/><path d='M25,35 Q15,30 12,45 Q20,55 26,45 Z' fill='%23475569'/><path d='M75,35 Q85,30 88,45 Q80,55 74,45 Z' fill='%23475569'/><circle cx='38' cy='58' r='4' fill='%23f43f5e' opacity='0.4'/><circle cx='62' cy='58' r='4' fill='%23f43f5e' opacity='0.4'/></svg>");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            filter: drop-shadow(0 0 10px #38bdf8);
+        }
+
+        .overlay h1 {
+            font-size: 2.4rem;
+            color: #38bdf8;
+            text-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+            margin-bottom: 5px;
+            font-family: 'Arial Black', sans-serif;
+        }
+
+        .overlay p {
+            font-size: 0.95rem;
+            color: #cbd5e1;
+            margin-bottom: 25px;
+            line-height: 1.5;
+        }
+
+        .overlay button {
+            background: linear-gradient(135deg, #38bdf8, #0369a1);
+            color: white;
+            border: none;
+            padding: 14px 45px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.4);
+            transition: transform 0.1s;
+        }
+
+        .overlay button:active {
+            transform: scale(0.95);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        <div id="score-board">FISH: <span id="score">0</span></div>
+
+        <canvas id="gameCanvas"></canvas>
+
+        <div id="btn-left" class="touch-btn"></div>
+        <div id="btn-right" class="touch-btn"></div>
+
+        <div id="start-overlay" class="overlay">
+            <h1>FISH CATCHER</h1>
+            <div class="character-img"></div>
+            <p>画面の左半分タップで左移動<br>右半分タップで右移動して魚をキャッチ！</p>
+            <button id="start-btn">START GAME</button>
+        </div>
+
+        <div id="gameover-overlay" class="overlay hidden">
+            <h1>GAME OVER</h1>
+            <p style="color: #ef4444;">魚を逃がしてしまった…！</p>
+            <h2 style="font-size: 1.8rem; margin-bottom: 30px;">SCORE: <span id="final-score">0</span></h2>
+            <button id="restart-btn">RETRY</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const finalScoreEl = document.getElementById('final-score');
+        
+        const startOverlay = document.getElementById('start-overlay');
+        const gameoverOverlay = document.getElementById('gameover-overlay');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const btnLeft = document.getElementById('btn-left');
+        const btnRight = document.getElementById('btn-right');
+
+        let gameState = 'START';
+        let score = 0;
+        let animationFrameId;
+
+        function resizeCanvas() {
+            const container = document.getElementById('game-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // プレイヤー（網・カゴをイメージしたカゴ型の四角）
+        const player = {
+            width: 70,
+            height: 25,
+            x: 0,
+            y: 0,
+            speed: 7,
+            color: '#e2e8f0'
+        };
+
+        // 魚オブジェクト
+        const fish = {
+            x: 0,
+            y: 0,
+            width: 40,
+            height: 20,
+            speed: 4,
+            baseSpeed: 4,
+            color: '#f97316' // 美味しそうなオレンジ色の魚
+        };
+
+        let isMovingLeft = false;
+        let isMovingRight = false;
+
+        // タッチイベント
+        btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); isMovingLeft = true; });
+        btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); isMovingLeft = false; });
+        btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); isMovingRight = true; });
+        btnRight.addEventListener('touchend', (e) => { e.preventDefault(); isMovingRight = false; });
+
+        // PCテスト用キーボードイベント
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') isMovingLeft = true;
+            if (e.key === 'ArrowRight' || e.key === 'd') isMovingRight = true;
+        });
+        window.addEventListener('keyup', (e) => {
+            if (e.key === 'ArrowLeft' || e.key === 'a') isMovingLeft = false;
+            if (e.key === 'ArrowRight' || e.key === 'd') isMovingRight = false;
+        });
+
+        function resetFish() {
+            fish.x = Math.random() * (canvas.width - fish.width);
+            fish.y = -fish.height;
+            fish.speed = Math.min(fish.baseSpeed + Math.floor(score / 5) * 0.8, 11);
+        }
+
+        function initGame() {
+            score = 0;
+            scoreEl.textContent = score;
+            
+            player.width = canvas.width * 0.2;
+            player.height = 22;
+            player.x = (canvas.width - player.width) / 2;
+            player.y = canvas.height - player.height - 50;
+            
+            resetFish();
+        }
+
+        // 魚を描画する関数
+        function drawFish(x, y, w, h) {
+            ctx.save();
+            ctx.fillStyle = fish.color;
+            
+            // 魚の体
+            ctx.beginPath();
+            ctx.ellipse(x + w * 0.4, y + h * 0.5, w * 0.4, h * 0.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // 尾ひれ
+            ctx.beginPath();
+            ctx.moveTo(x + w * 0.7, y + h * 0.5);
+            ctx.lineTo(x + w, y + h * 0.1);
+            ctx.lineTo(x + w * 0.85, y + h * 0.5);
+            ctx.lineTo(x + w, y + h * 0.9);
+            ctx.closePath();
+            ctx.fill();
+
+            // 目
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.2, y + h * 0.4, h * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(x + w * 0.18, y + h * 0.4, h * 0.07, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 背景にうっすら泡の演出（簡易版）
+            ctx.fillStyle = 'rgba(255,255,255,0.1)';
+            ctx.beginPath();
+            ctx.arc(canvas.width * 0.3, (canvas.height * 0.4 + score * 2) % canvas.height, 8, 0, Math.PI*2);
+            ctx.arc(canvas.width * 0.7, (canvas.height * 0.2 + score * 5) % canvas.height, 12, 0, Math.PI*2);
+            ctx.fill();
+
+            // プレイヤー移動
+            if (isMovingLeft) {
+                player.x -= player.speed;
+                if (player.x < 0) player.x = 0;
+            }
+            if (isMovingRight) {
+                player.x += player.speed;
+                if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+            }
+
+            // 魚の落下
+            fish.y += fish.speed;
+
+            // 当たり判定 (魚の体部分がプレイヤーに乗ったらキャッチ)
+            if (
+                fish.y + fish.height >= player.y &&
+                fish.y <= player.y + player.height &&
+                fish.x + fish.width * 0.6 >= player.x &&
+                fish.x <= player.x + player.width
+            ) {
+                score++;
+                scoreEl.textContent = score;
+                resetFish();
+            } else if (fish.y > canvas.height) {
+                endGame();
+                return;
+            }
+
+            // 描画：プレイヤー（受けカゴ風の形）
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.roundRect(player.x, player.y, player.width, player.height, [0, 0, 10, 10]);
+            ctx.fill();
+            // カゴのフチ
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(player.x - 2, player.y, player.width + 4, 5);
+
+            // 描画：魚
+            drawFish(fish.x, fish.y, fish.width, fish.height);
+
+            animationFrameId = requestAnimationFrame(update);
+        }
+
+        function startGame() {
+            gameState = 'PLAYING';
+            startOverlay.classList.add('hidden');
+            gameoverOverlay.classList.add('hidden');
+            resizeCanvas();
+            initGame();
+            update();
+        }
+
+        function endGame() {
+            gameState = 'GAMEOVER';
+            cancelAnimationFrame(animationFrameId);
+            finalScoreEl.textContent = score;
+            gameoverOverlay.classList.remove('hidden');
+        }
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+    </script>
+</body>
+</html>
